@@ -1,0 +1,629 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Habit Journal</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one bordered card (identity, progress, streak, day grid) and one journal card (ratings, markdown write bar, if-then plan). Dark first, light variant. */
+:root {
+  --bg: #000000;
+  --card: #060807;
+  --line: #262b29;
+  --fg: #f2f5f3;
+  --muted: #8d9792;
+  --accent: #22b36b;
+  --accent-soft: #04140c;
+  --blue: #4aa3ff;
+  --blue-soft: #08182b;
+  --warn: #ff6b6b;
+  --warn-soft: #1c0909;
+  --field: #0b0d0c;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f3f6f4; --card: #ffffff; --line: #d8dfdb; --fg: #0c1210; --muted: #5a6661;
+    --accent: #118a50; --accent-soft: #e3f4ea; --blue: #14609f; --blue-soft: #e2eefa;
+    --warn: #b3261e; --warn-soft: #fdecea; --field: #fbfdfc;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f3f6f4; --card: #ffffff; --line: #d8dfdb; --fg: #0c1210; --muted: #5a6661;
+  --accent: #118a50; --accent-soft: #e3f4ea; --blue: #14609f; --blue-soft: #e2eefa;
+  --warn: #b3261e; --warn-soft: #fdecea; --field: #fbfdfc;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-block: 24px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 760px; margin: 0 auto; display: grid; gap: 16px; }
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+  min-width: 0;
+}
+h1 { font-size: 1.1rem; font-weight: 600; margin: 0 0 6px; text-wrap: balance; }
+.identity-line { margin: 0 0 16px; color: var(--accent); font-weight: 600; overflow-wrap: anywhere; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.count { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.pill {
+  background: var(--blue-soft); color: var(--blue);
+  font-size: 0.85rem; font-weight: 600; padding: 4px 12px; border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.bar { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin: 14px 0 12px; }
+.bar > span { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 999px; transition: width .3s ease; }
+.habit-line { color: var(--fg); margin: 0 0 12px; overflow-wrap: anywhere; }
+
+.stats { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.chip {
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px;
+  font-size: 0.82rem; color: var(--muted); font-variant-numeric: tabular-nums;
+}
+.chip b { color: var(--fg); font-weight: 600; }
+
+.alert {
+  background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn);
+  border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; font-size: 0.9rem; font-weight: 500;
+}
+
+.settings { display: grid; grid-template-columns: 1fr; gap: 10px; margin-bottom: 18px; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; }
+.field { display: grid; gap: 4px; min-width: 0; flex: 1 1 140px; }
+.field label, .lab { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+input[type="text"], input[type="date"], select, textarea {
+  width: 100%; background: var(--field); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px;
+  font: inherit; min-width: 0;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 8px; }
+.day {
+  appearance: none; font: inherit; color: var(--fg); cursor: pointer;
+  background: var(--field); border: 1px solid var(--line); border-radius: 12px;
+  padding: 10px 4px 9px; display: grid; justify-items: center; gap: 2px; min-height: 84px; align-content: center;
+}
+.day:hover { border-color: var(--muted); }
+.day .mark { height: 22px; display: grid; place-items: center; font-size: 1.15rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.day .mark svg { width: 20px; height: 20px; }
+.day .lbl { font-size: 0.8rem; }
+.day .date { font-family: var(--font-mono); font-size: 0.68rem; color: var(--muted); }
+.day.done { background: var(--accent-soft); border-color: transparent; }
+.day.done .mark { color: var(--accent); }
+.day.today .date { color: var(--accent); font-weight: 500; }
+.day.sel { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.editor-head h2 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.editor-head .sub { color: var(--muted); font-family: var(--font-mono); font-size: 0.8rem; }
+.check { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.9rem; }
+.check input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.remind {
+  background: var(--field); border: 1px solid var(--line); border-radius: 10px;
+  padding: 10px 12px; display: grid; gap: 6px; margin-bottom: 14px; font-size: 0.9rem; overflow-wrap: anywhere;
+}
+.remind .k { font-family: var(--font-mono); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-right: 8px; }
+
+.rates { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 14px; }
+.rate-group { display: grid; gap: 6px; }
+.rate { display: flex; gap: 6px; }
+.rate button {
+  appearance: none; font: inherit; font-size: 0.9rem; font-variant-numeric: tabular-nums; cursor: pointer;
+  width: 38px; height: 36px; border-radius: 9px; border: 1px solid var(--line); background: var(--field); color: var(--fg);
+}
+.rate button:hover { border-color: var(--muted); }
+.rate button[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.hint { font-size: 0.75rem; color: var(--muted); margin-top: -6px; margin-bottom: 14px; }
+
+.tabs { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+.tabs button {
+  appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 0.85rem;
+  padding: 6px 14px; cursor: pointer;
+}
+.tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+textarea {
+  min-height: 380px; resize: vertical; font-family: var(--font-mono); font-size: 0.88rem; line-height: 1.65;
+}
+.preview {
+  min-height: 380px; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; overflow-wrap: anywhere;
+}
+.preview h2, .preview h3, .preview h4 { margin: 14px 0 4px; font-size: 1rem; text-wrap: balance; }
+.preview h2:first-child, .preview h3:first-child { margin-top: 2px; }
+.preview ul { margin: 4px 0 8px; padding-left: 20px; }
+.preview p { margin: 4px 0; }
+.preview code { font-family: var(--font-mono); font-size: 0.85em; background: var(--line); padding: 1px 5px; border-radius: 5px; }
+.preview .empty { color: var(--muted); }
+
+.plan { margin-top: 16px; display: grid; gap: 8px; }
+.plan h3 { margin: 0; font-size: 0.95rem; font-weight: 600; }
+.plan-row { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; align-items: center; }
+.plan-row .lab { min-width: 34px; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+.btn {
+  appearance: none; font: inherit; font-size: 0.88rem; cursor: pointer; color: var(--fg);
+  background: transparent; border: 1px solid var(--line); border-radius: 10px; padding: 8px 14px;
+}
+.btn:hover { border-color: var(--muted); }
+.status { margin-left: auto; font-size: 0.8rem; color: var(--muted); }
+.reset { width: 100%; padding: 11px; border-radius: 999px; font-weight: 600; color: var(--muted); margin-top: 16px; }
+.reset.armed { color: var(--warn); border-color: var(--warn); }
+[hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
+</style>
+
+<div class="wrap">
+  <section class="card" aria-labelledby="title">
+    <h1 id="title">14-day habit journal</h1>
+    <p class="identity-line" id="identityline" hidden></p>
+
+    <div class="top">
+      <div class="count" id="count">0/14 days</div>
+      <div class="pill" id="pct">0% completed</div>
+    </div>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="bar"><span id="barfill"></span></div>
+    <p class="habit-line" id="habitline"></p>
+
+    <div class="stats">
+      <span class="chip">Current streak <b id="curStreak">0</b> days</span>
+      <span class="chip">Best streak <b id="bestStreak">0</b> days</span>
+    </div>
+    <div class="alert" id="alert" role="status" hidden></div>
+
+    <div class="settings">
+      <div class="field">
+        <label for="identity">My identity</label>
+        <input type="text" id="identity" maxlength="140" placeholder="I am the kind of person who wakes up on time and finishes what I start">
+      </div>
+      <div class="field">
+        <label for="habit">Habit</label>
+        <input type="text" id="habit" maxlength="120" placeholder="e.g. Wake up at my planned time">
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="start">Start date</label>
+          <input type="date" id="start">
+        </div>
+        <div class="field">
+          <label for="length">Length</label>
+          <select id="length">
+            <option value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="21">21 days</option>
+            <option value="30">30 days</option>
+            <option value="66">66 days</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <button class="btn reset" id="reset" type="button">Reset challenge</button>
+  </section>
+
+  <section class="card" id="editor" aria-labelledby="edtitle">
+    <div class="editor-head">
+      <div>
+        <h2 id="edtitle">Day 1</h2>
+        <div class="sub" id="edsub"></div>
+      </div>
+      <label class="check"><input type="checkbox" id="donebox"> Done for this day</label>
+    </div>
+
+    <div class="remind" id="remind" hidden></div>
+
+    <div class="rates">
+      <div class="rate-group">
+        <span class="lab" id="moodLab">Mood</span>
+        <div class="rate" id="moodRate" role="group" aria-labelledby="moodLab"></div>
+      </div>
+      <div class="rate-group">
+        <span class="lab" id="energyLab">Energy</span>
+        <div class="rate" id="energyRate" role="group" aria-labelledby="energyLab"></div>
+      </div>
+    </div>
+    <div class="hint">1 = low, 5 = great. Tap the same number again to clear it.</div>
+
+    <div class="tabs" role="group" aria-label="Editor mode">
+      <button type="button" id="tabWrite" aria-pressed="true">Write</button>
+      <button type="button" id="tabPreview" aria-pressed="false">Preview</button>
+    </div>
+    <textarea id="note" aria-label="Journal entry in markdown" spellcheck="true"></textarea>
+    <div class="preview" id="preview" hidden></div>
+
+    <div class="plan">
+      <h3>Plan for tomorrow (if-then)</h3>
+      <div class="plan-row">
+        <label class="lab" for="planIf">If</label>
+        <input type="text" id="planIf" maxlength="160" placeholder="my alarm rings at 6:00">
+        <label class="lab" for="planThen">Then</label>
+        <input type="text" id="planThen" maxlength="160" placeholder="I put both feet on the floor and stand up immediately">
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn" type="button" id="copyDay">Copy this day</button>
+      <button class="btn" type="button" id="copyAll">Copy all as markdown</button>
+      <span class="status" id="status" aria-live="polite"></span>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  var KEY = "habit-journal-v1";
+  var TEMPLATE =
+    "## Habit loop\n" +
+    "- Cue (what triggered it): \n" +
+    "- Craving (what I really wanted): \n" +
+    "- Response (what I did): \n" +
+    "- Reward (what I got, was it worth it?): \n\n" +
+    "## Identity vote\n" +
+    "- Today I acted like the person I want to become by: \n\n" +
+    "## What I learned today\n- \n\n" +
+    "## What went wrong today\n- \n\n" +
+    "## What to improve tomorrow\n- \n\n" +
+    "## One small win\n- ";
+  var CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/></svg>';
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function isoOf(d) { return d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate()); }
+  function parseISO(s) { var p = s.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  function dayDate(i) { var d = parseISO(state.start); d.setDate(d.getDate() + i); return d; }
+  function fmt(d) { return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }); }
+  function fmtLong(d) { return d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }); }
+  function todayIndex() { return Math.round((parseISO(isoOf(new Date())) - parseISO(state.start)) / 86400000); }
+
+  var state = load();
+  function load() {
+    var base = { identity: "", habit: "Wake up at my planned time", start: isoOf(new Date()), length: 14, days: {} };
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && typeof s === "object") {
+          return {
+            identity: typeof s.identity === "string" ? s.identity : "",
+            habit: typeof s.habit === "string" ? s.habit : base.habit,
+            start: typeof s.start === "string" ? s.start : base.start,
+            length: [7, 14, 21, 30, 66].indexOf(+s.length) >= 0 ? +s.length : 14,
+            days: s.days && typeof s.days === "object" ? s.days : {}
+          };
+        }
+      }
+    } catch (e) {}
+    return base;
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); return true; } catch (e) { return false; }
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var els = {
+    title: $("title"), idline: $("identityline"), count: $("count"), pct: $("pct"), bar: $("bar"), fill: $("barfill"), line: $("habitline"),
+    cur: $("curStreak"), best: $("bestStreak"), alert: $("alert"),
+    identity: $("identity"), habit: $("habit"), start: $("start"), length: $("length"), grid: $("grid"), reset: $("reset"),
+    editor: $("editor"), edtitle: $("edtitle"), edsub: $("edsub"), donebox: $("donebox"), remind: $("remind"),
+    tabWrite: $("tabWrite"), tabPreview: $("tabPreview"), note: $("note"), preview: $("preview"),
+    planIf: $("planIf"), planThen: $("planThen"),
+    copyDay: $("copyDay"), copyAll: $("copyAll"), status: $("status")
+  };
+
+  var selected = 0;
+  (function pickToday() {
+    var t = todayIndex();
+    selected = t >= 0 && t < state.length ? t : 0;
+  })();
+
+  function isDone(i) { return !!(state.days[i] && state.days[i].done); }
+  function doneCount() {
+    var n = 0;
+    for (var i = 0; i < state.length; i++) { if (isDone(i)) n++; }
+    return n;
+  }
+
+  function streaks() {
+    var t = todayIndex(), cur = 0, best = 0, run = 0, j;
+    if (t >= 0) {
+      var anchor = Math.min(t, state.length - 1);
+      var i = isDone(anchor) ? anchor : anchor - 1;
+      while (i >= 0 && isDone(i)) { cur++; i--; }
+    }
+    for (j = 0; j < state.length; j++) {
+      if (isDone(j)) { run++; if (run > best) best = run; } else { run = 0; }
+    }
+    return { cur: cur, best: best };
+  }
+
+  function alertText() {
+    var t = todayIndex();
+    if (t < 1 || t >= state.length || isDone(t)) return "";
+    var misses = 0, i = t - 1;
+    while (i >= 0 && !isDone(i)) { misses++; i--; }
+    if (misses === 0) return "";
+    if (misses === 1) return "You missed yesterday. Never miss twice: do today's habit, even the smallest version, and mark today.";
+    return "You have missed " + misses + " days in a row. Restart today with the smallest version of your habit and mark today.";
+  }
+
+  function lowerFirst(s) { return s.charAt(0).toLowerCase() + s.slice(1); }
+
+  function renderHeader() {
+    var n = doneCount(), pct = Math.round((n / state.length) * 100);
+    els.title.textContent = state.length + "-day habit journal";
+    els.count.textContent = n + "/" + state.length + " days";
+    els.pct.textContent = pct + "% completed";
+    els.fill.style.width = pct + "%";
+    els.bar.setAttribute("aria-valuenow", String(pct));
+    els.line.textContent = state.habit
+      ? "Tick each day when you " + lowerFirst(state.habit) + "."
+      : "Tick each day when you complete your habit.";
+    if (state.identity.trim()) { els.idline.textContent = state.identity.trim(); els.idline.hidden = false; }
+    else { els.idline.hidden = true; }
+    var s = streaks();
+    els.cur.textContent = s.cur;
+    els.best.textContent = s.best;
+    var a = alertText();
+    els.alert.textContent = a;
+    els.alert.hidden = !a;
+  }
+
+  function renderGrid() {
+    var todayISO = isoOf(new Date());
+    var html = "";
+    for (var i = 0; i < state.length; i++) {
+      var d = dayDate(i), done = isDone(i);
+      var cls = "day" + (done ? " done" : "") + (i === selected ? " sel" : "") + (isoOf(d) === todayISO ? " today" : "");
+      html += '<button type="button" class="' + cls + '" data-i="' + i + '" aria-pressed="' + done + '" aria-label="Day ' + (i + 1) + ", " + fmt(d) + (done ? ", done" : "") + '">' +
+        '<span class="mark">' + (done ? CHECK : (i + 1)) + '</span>' +
+        '<span class="lbl">Day ' + (i + 1) + '</span>' +
+        '<span class="date">' + fmt(d) + '</span></button>';
+    }
+    els.grid.innerHTML = html;
+  }
+
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function renderRemind() {
+    var parts = [];
+    if (state.identity.trim()) {
+      parts.push('<div><span class="k">Voting for</span>' + esc(state.identity.trim()) + '</div>');
+    }
+    var prev = selected > 0 ? state.days[selected - 1] : null;
+    if (prev && ((prev.planIf && prev.planIf.trim()) || (prev.planThen && prev.planThen.trim()))) {
+      var pi = prev.planIf && prev.planIf.trim() ? esc(prev.planIf.trim()) : "...";
+      var pt = prev.planThen && prev.planThen.trim() ? esc(prev.planThen.trim()) : "...";
+      parts.push('<div><span class="k">Yesterday\'s plan</span>If ' + pi + ', then I will ' + pt + '.</div>');
+    }
+    els.remind.innerHTML = parts.join("");
+    els.remind.hidden = parts.length === 0;
+  }
+
+  function paintRates() {
+    var entry = state.days[selected] || {};
+    ["mood", "energy"].forEach(function (k) {
+      var btns = $(k + "Rate").children;
+      for (var i = 0; i < btns.length; i++) btns[i].setAttribute("aria-pressed", String(entry[k] === i + 1));
+    });
+  }
+
+  function loadEditor() {
+    var d = dayDate(selected), entry = state.days[selected];
+    els.edtitle.textContent = "Day " + (selected + 1) + " journal";
+    els.edsub.textContent = fmtLong(d);
+    els.donebox.checked = !!(entry && entry.done);
+    els.note.value = entry && typeof entry.note === "string" ? entry.note : TEMPLATE;
+    els.planIf.value = entry && entry.planIf ? entry.planIf : "";
+    els.planThen.value = entry && entry.planThen ? entry.planThen : "";
+    renderRemind();
+    paintRates();
+    setMode("write");
+    els.status.textContent = "";
+  }
+
+  function setMode(mode) {
+    var w = mode === "write";
+    els.tabWrite.setAttribute("aria-pressed", String(w));
+    els.tabPreview.setAttribute("aria-pressed", String(!w));
+    els.note.hidden = !w;
+    els.preview.hidden = w;
+    if (!w) {
+      var html = md(els.note.value);
+      els.preview.innerHTML = html || '<p class="empty">Nothing written yet.</p>';
+    }
+  }
+
+  function inline(s) {
+    return esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*([^*]+)\*/g, "<em>$1</em>");
+  }
+  function md(src) {
+    var out = [], list = false, lines = src.split("\n");
+    function close() { if (list) { out.push("</ul>"); list = false; } }
+    for (var k = 0; k < lines.length; k++) {
+      var l = lines[k].replace(/\s+$/, ""), m;
+      if ((m = l.match(/^(#{1,3})\s+(.*)$/))) {
+        close(); var lv = m[1].length + 1;
+        out.push("<h" + lv + ">" + inline(m[2]) + "</h" + lv + ">");
+      } else if (/^\s*[-*]$/.test(l)) {
+        continue;
+      } else if ((m = l.match(/^\s*[-*]\s+(.*)$/))) {
+        if (!m[1].replace(/^[^:]*:\s*$/, "").trim()) continue;
+        if (!list) { out.push("<ul>"); list = true; }
+        out.push("<li>" + inline(m[1]) + "</li>");
+      } else if (!l.trim()) {
+        close();
+      } else {
+        close(); out.push("<p>" + inline(l) + "</p>");
+      }
+    }
+    close();
+    var hasText = out.some(function (x) { return x.indexOf("<li>") === 0 || x.indexOf("<p>") === 0; });
+    return hasText ? out.join("") : "";
+  }
+
+  function flash(msg) {
+    els.status.textContent = msg;
+    clearTimeout(flash.t);
+    flash.t = setTimeout(function () { els.status.textContent = ""; }, 2500);
+  }
+
+  function ensure(i) { if (!state.days[i]) state.days[i] = { done: false }; return state.days[i]; }
+
+  function refreshTop() { renderHeader(); renderGrid(); }
+
+  els.grid.addEventListener("click", function (e) {
+    var b = e.target.closest(".day");
+    if (!b) return;
+    selected = +b.getAttribute("data-i");
+    var entry = ensure(selected);
+    if (!entry.done) entry.done = true;
+    save();
+    refreshTop(); loadEditor();
+    els.editor.scrollIntoView({ block: "nearest", behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+  });
+
+  els.donebox.addEventListener("change", function () {
+    ensure(selected).done = els.donebox.checked;
+    save(); refreshTop();
+    flash(els.donebox.checked ? "Marked done" : "Marked not done");
+  });
+
+  els.note.addEventListener("input", function () {
+    ensure(selected).note = els.note.value;
+    var ok = save();
+    flash(ok ? "Saved" : "Not saved: browser storage is blocked");
+  });
+
+  els.planIf.addEventListener("input", function () {
+    ensure(selected).planIf = els.planIf.value; save(); flash("Saved");
+  });
+  els.planThen.addEventListener("input", function () {
+    ensure(selected).planThen = els.planThen.value; save(); flash("Saved");
+  });
+
+  ["mood", "energy"].forEach(function (k) {
+    var box = $(k + "Rate"), h = "";
+    for (var v = 1; v <= 5; v++) {
+      h += '<button type="button" data-v="' + v + '" aria-pressed="false" aria-label="' + k + " " + v + ' of 5">' + v + "</button>";
+    }
+    box.innerHTML = h;
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest("button");
+      if (!b) return;
+      var val = +b.getAttribute("data-v"), entry = ensure(selected);
+      if (entry[k] === val) { delete entry[k]; } else { entry[k] = val; }
+      save(); paintRates(); flash("Saved");
+    });
+  });
+
+  els.tabWrite.addEventListener("click", function () { setMode("write"); });
+  els.tabPreview.addEventListener("click", function () { setMode("preview"); });
+
+  els.identity.addEventListener("input", function () {
+    state.identity = els.identity.value; save(); renderHeader(); renderRemind();
+  });
+  els.habit.addEventListener("input", function () {
+    state.habit = els.habit.value; save(); renderHeader();
+  });
+  els.start.addEventListener("change", function () {
+    if (!els.start.value) return;
+    state.start = els.start.value; save(); refreshTop(); loadEditor();
+  });
+  els.length.addEventListener("change", function () {
+    state.length = +els.length.value;
+    if (selected >= state.length) selected = 0;
+    save(); refreshTop(); loadEditor();
+  });
+
+  function copyText(text, okMsg) {
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      var ok = false;
+      try { ok = document.execCommand("copy"); } catch (e) {}
+      document.body.removeChild(ta);
+      flash(ok ? okMsg : "Copy blocked. Select the text and copy it manually.");
+    }
+    try {
+      navigator.clipboard.writeText(text).then(function () { flash(okMsg); }, fallback);
+    } catch (e) { fallback(); }
+  }
+
+  function dayMarkdown(i, note) {
+    var e = state.days[i] || {}, d = dayDate(i), meta = [];
+    if (e.mood) meta.push("Mood: " + e.mood + "/5");
+    if (e.energy) meta.push("Energy: " + e.energy + "/5");
+    var out = "## Day " + (i + 1) + " · " + fmt(d) + (e.done ? " ✅" : "") + "\n\n";
+    if (meta.length) out += meta.join(" · ") + "\n\n";
+    out += note + "\n";
+    if ((e.planIf && e.planIf.trim()) || (e.planThen && e.planThen.trim())) {
+      out += "\n**Plan for tomorrow:** If " + (e.planIf || "...").trim() + ", then I will " + (e.planThen || "...").trim() + ".\n";
+    }
+    return out;
+  }
+
+  els.copyDay.addEventListener("click", function () {
+    copyText(dayMarkdown(selected, els.note.value), "Copied this day");
+  });
+  els.copyAll.addEventListener("click", function () {
+    var parts = ["# " + (state.habit || "Habit journal")];
+    if (state.identity.trim()) parts.push("", "_" + state.identity.trim() + "_");
+    parts.push("");
+    for (var i = 0; i < state.length; i++) {
+      var e = state.days[i];
+      var hasNote = e && typeof e.note === "string" && e.note.trim();
+      if (!e || (!e.done && !hasNote && !e.mood && !e.energy && !e.planIf && !e.planThen)) continue;
+      parts.push(dayMarkdown(i, typeof e.note === "string" ? e.note : ""));
+    }
+    copyText(parts.join("\n"), "Copied all entries");
+  });
+
+  var armTimer;
+  els.reset.addEventListener("click", function () {
+    if (!els.reset.classList.contains("armed")) {
+      els.reset.classList.add("armed");
+      els.reset.textContent = "Tap again to erase all days and notes";
+      armTimer = setTimeout(disarm, 4000);
+      return;
+    }
+    disarm();
+    state.days = {}; selected = 0; save();
+    refreshTop(); loadEditor();
+    flash("Challenge reset");
+  });
+  function disarm() {
+    clearTimeout(armTimer);
+    els.reset.classList.remove("armed");
+    els.reset.textContent = "Reset challenge";
+  }
+
+  els.identity.value = state.identity;
+  els.habit.value = state.habit;
+  els.start.value = state.start;
+  els.length.value = String(state.length);
+  refreshTop(); loadEditor();
+})();
+</script>
+
+</body></html>
